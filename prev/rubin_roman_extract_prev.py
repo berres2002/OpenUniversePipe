@@ -222,7 +222,7 @@ def download_roman(coords, filter_roman, rubin_ims, wcs_rubin, fpath=None, split
             ans = save_centered_cutouts(big_array, cutout_size=64, band_idx=-1, fpath=fpath, cutout_fname=cutout_fname)
             annots['path'].extend(ans['path'])
             annots['img'].extend(ans['img'])
-        if len(annots['path']) > max_images:
+        if len(annots['path']) > max_images and max_images>0: # stop after we have downloaded a certain number of cutouts to avoid memory issues and set max_images to -1 to download all cutouts
             print(f"Reached max number of images N = {max_images}, stopping download.")
             break
     return annots
@@ -244,7 +244,7 @@ if __name__ == "__main__":
     filter_roman = ['Y106','J129','H158'] #F184, H158, J129, K213, and Y106 are available in the data preview
     filter_rubin = ['u','g','r','i','z','y']
     rubin_ims, wcs_rubin = download_rubin(filter_rubin)
-    annots = download_roman(coords, filter_roman, rubin_ims, wcs_rubin, fpath=fpath, split_size=42)
+    annots = download_roman(coords, filter_roman, rubin_ims, wcs_rubin, fpath=fpath, max_images=-1)
     # annots=download_roman_cutouts(coords,filter_roman,fpath=fpath, split_size=42)
         # annots['path'].append(path)
         # annots['img'].append(path.split('/')[-1])
