@@ -38,6 +38,20 @@ dec_block_centers = np.array([-44.252584927082495, -44.22480733304182, -44.19702
                             -44.0025863212379, -43.974808711298394, -43.94703111591591]) * u.deg
 block_size = 100 * u.arcsec # each block is 100 arcsec across
 
+def get_radec_bounds(wcs):
+    max1=wcs.pixel_to_world(wcs._naxis[0], wcs._naxis[1])
+    min1=wcs.pixel_to_world(0, 0)
+
+    if max1.ra.deg > min1.ra.deg:
+        ra_max, ra_min = max1.ra.deg, min1.ra.deg
+    else:
+        ra_max, ra_min = min1.ra.deg, max1.ra.deg
+    if max1.dec.deg > min1.dec.deg:
+        dec_max, dec_min = max1.dec.deg, min1.dec.deg
+    else:
+        dec_max, dec_min = min1.dec.deg, max1.dec.deg
+    return ra_min, ra_max, dec_min, dec_max
+
 
 def get_block_axis(block_centers, coord, ra_or_dec):
     ra_or_dec_coord = getattr(coord, ra_or_dec)
@@ -197,10 +211,45 @@ def save_centered_cutouts(img, cutout_size=64, band_idx=None, fpath=None, cutout
             else: 
                 raise ValueError(f"Provided path {fpath} does not exist. Please provide a valid path or set path to None to save in current working directory.")
     return annots
-        
-        # save cutout
 
-def download_roman(coords, filter_roman, rubin_ims, wcs_rubin, fpath=None, split_size=4, max_images=2200):
+def save_centered_cutouts_fromTable(table, img, wcs, cutout_size=64, fpath=None, cutout_fname=''):
+    annots = {'path':[], 'img':[]}
+    if img.ndim == 3:
+        multiband = True
+        #     image = img[band_idx] # use specified band for finding peaks to center cutouts on
+        # else:
+        #     raise ValueError("For 3D image cubes, please specify the band index to use for finding local peaks to center cutouts on.")
+    elif img.ndim == 2:
+        multiband = False
+        image = img
+    else:
+        raise ValueError("Input image must be either a 2D array or a 3D cube with shape (bands, height, width)")
+    ra_min, ra_max, dec_min, dec_max = get_radec_bounds(wcs)
+    tqi = table.query(f"ra > {ra_min} and ra < {ra_max} and dec > {dec_min} and dec < {dec_max}")
+    for row in tqi[['ra','dec']].to_numpy():
+        cutout = Cutout2D(img, SkyCoord(ra=row[0], dec=row[1],unit='deg'), (cutout_size, cutout_size), wcs=wcs).slices_original
+        # save cutout
+        if multiband:
+            cutout_data = img[:, cutout[0], cutout[1]]
+        else:
+            cutout_data = img[cutout[0], cutout[1]]
+        if fpath is not None:
+            if os.path.exists(fpath):
+                if row[1]<0:
+                    dec_str = f"{row[1]*-1:0.4f}"
+                else:
+                    dec_str = f"{row[1]:0.4f}"
+                fname = cutout_fname+f"_cut_{row[0]:0.4f}_{dec_str}.npy"
+                save_path = os.path.join(fpath, 'data', fname)
+
+                np.save(save_path, cutout_data.astype(np.float32))
+                annots['path'].append(save_path)
+                annots['img'].append(fname)
+            else: 
+                raise ValueError(f"Provided path {fpath} does not exist. Please provide a valid path or set path to None to save in current working directory.")
+    return annots
+
+def download_roman(coords, filter_roman, rubin_ims, wcs_rubin, fpath=None, split_size=4, max_images=2200, table=None):
     # roman_ims = []
     # wcs_roman = []
     #allocate big array
@@ -219,7 +268,8 @@ def download_roman(coords, filter_roman, rubin_ims, wcs_rubin, fpath=None, split
             name_split = coadd_fname.split('_')
             cutout_fname = f"ugrizy_YJH_{name_split[2]}_{name_split[3]}_map"
             # ans = save_cutouts(big_array, cutout_fname, fpath, split_size=split_size)
-            ans = save_centered_cutouts(big_array, cutout_size=64, band_idx=-1, fpath=fpath, cutout_fname=cutout_fname)
+            # ans = save_centered_cutouts(big_array, cutout_size=64, band_idx=-1, fpath=fpath, cutout_fname=cutout_fname)
+            ans = save_centered_cutouts_fromTable(table, big_array, roman_wcs, cutout_size=64, fpath=fpath, cutout_fname=cutout_fname)
             annots['path'].extend(ans['path'])
             annots['img'].extend(ans['img'])
         if len(annots['path']) > max_images and max_images>0: # stop after we have downloaded a certain number of cutouts to avoid memory issues and set max_images to -1 to download all cutouts
@@ -241,10 +291,11 @@ if __name__ == "__main__":
     # for i in range(ra_block_centers.size): #ra_block_centers.size
     #     coord = SkyCoord(ra=ra_block_centers[i], dec=dec_block_centers[i], unit="deg")
     #     coords.append(coord)
+    table = pd.read_csv("roman_rubin_cat_v1.1.2_faint.csv") # read in the Roman Rubin catalog to use for centering cutouts on real sources
     filter_roman = ['Y106','J129','H158'] #F184, H158, J129, K213, and Y106 are available in the data preview
     filter_rubin = ['u','g','r','i','z','y']
     rubin_ims, wcs_rubin = download_rubin(filter_rubin)
-    annots = download_roman(coords, filter_roman, rubin_ims, wcs_rubin, fpath=fpath, max_images=-1)
+    annots = download_roman(coords, filter_roman, rubin_ims, wcs_rubin, fpath=fpath, max_images=-1,table=table)
     # annots=download_roman_cutouts(coords,filter_roman,fpath=fpath, split_size=42)
         # annots['path'].append(path)
         # annots['img'].append(path.split('/')[-1])
