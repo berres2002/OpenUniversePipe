@@ -16,6 +16,7 @@ import pandas as pd
 from tqdm import tqdm
 from reproject import reproject_interp
 from skimage.feature import peak_local_max
+import pickle
 
 
 # Open Universe Roman and Rubin Preview Paths
@@ -309,8 +310,8 @@ def download_roman(coords, filter_roman, rubin_ims, wcs_rubin, fpath=None, split
 
 if __name__ == "__main__":
     # annots = {'path':[], 'img':[]}
-    # fpath = '/work/hdd/bfpq/aberres2/demo_roman_rubin_centered'
-    fpath = '/Users/aberres/Desktop/research/rubin2roman/data/table_demo'
+    fpath = '/work/hdd/bfpq/aberres2/brightest_gals_cutouts_64'
+    # fpath = '/Users/aberres/Desktop/research/rubin2roman/data/table_demo'
     # coords=[]
     x,y=np.meshgrid(ra_block_centers[2:-2], dec_block_centers[2:-2]) # only use the full 8 by 8 Roman blocks that cover the full Rubin preview area
     coords = SkyCoord(ra=x, dec=y, unit="deg")
@@ -319,7 +320,14 @@ if __name__ == "__main__":
     #     coord = SkyCoord(ra=ra_block_centers[i], dec=dec_block_centers[i], unit="deg")
     #     coords.append(coord)
     # table = pd.read_csv("roman_rubin_cat_v1.1.2_faint.csv") # read in the Roman Rubin catalog to use for centering cutouts on real sources
-    table = pd.read_csv('/Users/aberres/Desktop/research/rubin2roman/test_galaxy_cat.csv') # smaller table with only 2 sources for testing
+    # table = pd.read_csv('/Users/aberres/Desktop/research/rubin2roman/test_galaxy_cat.csv') # smaller table with only 2 sources for testing
+    df = pd.read_parquet('/projects/bfpq/rubin2roman/galaxy_10307.parquet')
+    with open('/projects/bfpq/rubin2roman/bright_20000_y_flux_gals_inds.pkl', 'rb') as f:
+        inds = pickle.load(f)
+        f.close()
+    table = df.iloc[inds].reset_index(drop=True) # smaller table with only the brightest 20000 sources in the Rubin preview
+    del(inds)
+    del(df)
     filter_roman = ['Y106','J129','H158'] #F184, H158, J129, K213, and Y106 are available in the data preview
     filter_rubin = ['u','g','r','i','z','y']
     print("Downloading Rubin coadds...")
