@@ -280,7 +280,7 @@ def download_roman(coords, filter_roman, rubin_ims, wcs_rubin, fpath=None, split
         #         nogals = True
         #         break
         #     # end annoying query
-        #     big_array[i-3]=coadd_data
+            big_array[i-3]=coadd_data
         # #annoying check here
         # if nogals:
         #     nogals = False
