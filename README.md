@@ -1,6 +1,6 @@
 # OpenUniversePipe
 
-Figuring out how to download [OpenUniverse](https://irsa.ipac.caltech.edu/data/theory/Roman/Troxel2023/overview.html) data to use for training. The `prev` directory contains code to download the preview data from IRSA. 
+Figuring out how to download [OpenUniverse](https://irsa.ipac.caltech.edu/data/theory/Roman/Troxel2023/overview.html) data to use for training. The `prev` directory contains code to download the preview data from IRSA. The `delta` directory contains code to extract DC2 data from the [DeepDISC_Roman_Rubin](https://github.com/grantmerz/DeepDISC_Roman_Rubin/tree/main) project internally from various allocations on Delta (See [Roman DC2 Overview](https://irsa.ipac.caltech.edu/data/theory/Roman/Troxel2023/overview.html)).
 
 ## Helpful links:
 - [OpenUniverse et al. 2025 paper](https://ui.adsabs.harvard.edu/abs/2025arXiv250105632O)
