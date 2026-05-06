@@ -87,37 +87,58 @@ def make_cutout(img, wcs, pos_xy=None, pos_radec=None, cutout_size=64):
 
     return cutout_data, cutout_wcs
 
-
+def init_argparse():
+    import argparse
+    parser = argparse.ArgumentParser(description="Script to extract cutouts from Rubin and Roman coadds for training and evaluation of Rubin-to-Roman image translation models.")
+    parser.add_argument('--make_cutouts', action=argparse.BooleanOptionalAction, help='Whether to make cutouts from the coadd images. If False, the script will only add the paths to the full coadd images to the annotations file without making cutouts.')
+    parser.add_argument('--cutout_size', type=int, default=64, help='Size of the square cutouts to extract (in pixels).')
+    parser.add_argument('--rubin_img_dir', type=str, default='/work/hdd/bdsp/yse2/lsst_data/truth', help='Directory containing the Rubin coadd .npy files organized in subdirectories by tract and patch.')
+    parser.add_argument('--roman_img_dir', type=str, default='/work/hdd/bdsp/yse2/truth-roman', help='Directory containing the Roman coadd .npy files organized in subdirectories by tract and patch.')
+    parser.add_argument('--output', type=str, help='Directory where the extracted cutouts and annotations will be saved.')
+    # parser.add_argument('--dir_list_path', type=str, default='dir_list.pkl', help='Path to the pickle file containing the list of directories to process.')
+    parser.add_argument('--roman_wcs_json_path', type=str, default='/projects/bfhm/yse2/annotations_roman/all_wcs.json', help='Path to the JSON file containing WCS information for the Roman data.')
+    return parser.parse_args()
 
 if __name__ == "__main__":
-    # annots = {'path':[], 'img':[]}
+    args = init_argparse()
+    annots = {'path':[], 'img':[]}
     with open('dir_list.pkl', 'rb') as f:
         dir_list = pickle.load(f)
         f.close()
-    with open('/projects/bfhm/yse2/annotations_roman/all_wcs.json','r') as f:
+    with open(args.roman_wcs_json_path,'r') as f:
         roman_wcs_json = json.load(f)
         f.close()
 
     for dir in dir_list:
-        rubin_glob = glob.glob(f'/work/hdd/bdsp/yse2/lsst_data/truth/{dir}/*.npy')
-        with open(glob.glob(f'/work/hdd/bdsp/yse2/lsst_data/truth/{dir}/*wcs*.json')[0], 'r') as f:
+        rubin_glob = glob.glob(os.path.join(args.rubin_img_dir, f'{dir}/*.npy'))
+        with open(glob.glob(os.path.join(args.rubin_img_dir, f'{dir}/*wcs*.json'))[0], 'r') as f:
             rubin_wcs_json = json.load(f)
             f.close()
         # roman_glob = []
         for rubin_fname in rubin_glob:
             # roman_glob.append(os.path.join(f'/work/hdd/bdsp/yse2/truth-roman/{dir}', rubin_fname.split('/')[-1]))
-            roman_fname = os.path.join(f'/work/hdd/bdsp/yse2/truth-roman/{dir}', rubin_fname.split('/')[-1])
+            roman_fname = os.path.join(args.roman_img_dir, dir, rubin_fname.split('/')[-1])
             if os.path.exists(roman_fname):
                 pass
             else:
                 print(f"Roman file {roman_fname} does not exist. Please check the path and try again.")
                 continue
-            coadd_rubin, wcs_rubin = get_rubin_coadd(rubin_fname, rubin_wcs_json)
-            coadd_roman, wcs_roman = get_roman_coadd(roman_fname, roman_wcs_json)
-            if coadd_rubin == 1 or coadd_roman == 1:
-                print(f"Could not get WCS for Rubin or Roman coadd for file {rubin_fname}. Skipping this file.")
-                continue
-            # TODO: add in cutout making and saving here
+            if args.make_cutouts:
+                coadd_rubin, wcs_rubin = get_rubin_coadd(rubin_fname, rubin_wcs_json)
+                coadd_roman, wcs_roman = get_roman_coadd(roman_fname, roman_wcs_json)
+                if coadd_rubin == 1 or coadd_roman == 1:
+                    print(f"Could not get WCS for Rubin or Roman coadd for file {rubin_fname}. Skipping this file.")
+                    continue
+                # TODO: add in cutout making and saving here
 
+            else:
+                annots['roman_path'].append(roman_fname)
+                annots['roman_img'].append(roman_fname.split('/')[-1])
+                annots['rubin_path'].append(rubin_fname)
+                annots['rubin_img'].append(rubin_fname.split('/')[-1])
+    annotations = pd.DataFrame(annots)
+    ann_path =os.path.join(args.output, 'annotations.csv')
+    annotations.to_csv(ann_path, index=False)
+    print(f"Annotations saved to {ann_path}")
     # fpath = ''
 
