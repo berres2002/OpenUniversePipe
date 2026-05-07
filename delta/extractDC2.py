@@ -118,6 +118,9 @@ if __name__ == "__main__":
     with open('dir_list.pkl', 'rb') as f:
         dir_list = pickle.load(f)
         f.close()
+    # randomize dir_list to avoid any biases in the order of processing the data
+    np.random.seed(42069) # set seed for reproducibility
+    np.random.shuffle(dir_list)
     with open(args.roman_wcs_json_path,'r') as f:
         roman_wcs_json = json.load(f)
         f.close()
