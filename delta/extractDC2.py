@@ -55,6 +55,19 @@ def get_rubin_coadd(fname, wcs_json):
 def reproject_rubin_to_roman(rubin_ims, wcs_rubin, wcs_roman, coadd_roman):
     return reproject_interp((rubin_ims,wcs_rubin),wcs_roman,shape_out=coadd_roman['data'].shape)
 
+def get_objects_from_json(path):
+    objs = {'id':[], 'ra':[], 'dec':[]}
+    with open(path, 'r') as f:
+        data = json.load(f)
+        f.close()
+    for i in range(len(data)):
+        # truth_type 2 is star, 1 is galaxy
+        if data[i]['truth_type'] == 1:
+            objs['id'].append(data[i]['id'])
+            objs['ra'].append(data[i]['ra'])
+            objs['dec'].append(data[i]['dec'])
+    return objs
+
 def make_cutout(img, wcs, pos_xy=None, pos_radec=None, cutout_size=64):
     if img.ndim == 3:
         multiband = True
@@ -130,7 +143,24 @@ if __name__ == "__main__":
                     print(f"Could not get WCS for Rubin or Roman coadd for file {rubin_fname}. Skipping this file.")
                     continue
                 # TODO: add in cutout making and saving here
-
+                b, h, w = coadd_roman.shape
+                rubin_b, rubin_h, rubin_w = coadd_rubin.shape
+                big_array = np.zeros((b+rubin_b, h, w))
+                big_array[rubin_b:]=coadd_roman
+                big_array[:rubin_b]=reproject_rubin_to_roman(coadd_rubin, wcs_rubin, wcs_roman, coadd_roman)
+                # TODO: write cutouts centered on table sources function
+                truth_json_path = 'truth_'+rubin_fname.strip('.npy').split('/')[-1]+'.json'
+                truth_json_path = os.path.join(args.rubin_img_dir, dir, truth_json_path)
+                if os.path.exists(truth_json_path):
+                    objs = get_objects_from_json(truth_json_path)
+                    for i in range(len(objs['id'])):
+                        cutout_data, cutout_wcs = make_cutout(big_array, wcs_roman, pos_radec=(objs['ra'][i], objs['dec'][i]), cutout_size=args.cutout_size)
+                        if cutout_data is not None:
+                            cutout_fname = f"{rubin_fname.strip('.npy').split('/')[-1]}_cut_{objs['id'][i]}.npy"
+                            path = os.path.join(args.output, 'data', cutout_fname)
+                            np.save(path, cutout_data.astype(np.float32))
+                            annots['path'].append(path)
+                            annots['img'].append(cutout_fname)
             else:
                 annots['roman_path'].append(roman_fname)
                 annots['roman_img'].append(roman_fname.split('/')[-1])
